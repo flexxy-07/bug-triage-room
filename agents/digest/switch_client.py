@@ -35,3 +35,4 @@ class SwitchClient:
         """Send message to Switch room or thread."""
         # Will be implemented in Checkpoint 6
         return True
+

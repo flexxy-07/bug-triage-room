@@ -1,35 +1,72 @@
 # Switch Room Template: Bug Triage Room
-# Bridge: Mattermost bundled local server
-name: bug-triage
-description: Autonomous bug triage room with triager, repro, and digest agents.
+# Based on official Switch triage-pair.template.yaml
+version: 1
 
-bridge:
-  type: mattermost
-  channel: bug-triage
-
-kickoff_message: '@triager and @repro: this is the bug triage room. @digest will join to summarise and propose fixes.'
+params:
+  team:
+    type: string
+    description: Prefix for every name this creates
+    default: bug
+    pattern: "[a-z][a-z0-9-]*"
+  provider:
+    type: provider
+    description: Which coding agent backs both. The first one installed is chosen.
+    default: [opencode, claude, codex]
+    input: advanced
+  location:
+    type: location
+    description: The machine both run on.
+    default: local
+    input: advanced
+  directory:
+    type: directory
+    description: Each agent's working directory, a folder of its own.
+    default: "{$agents_dir}/{agent}"
+    input: advanced
+  bridge:
+    type: bridge
+    description: Where the room is mirrored. The server's default app is chosen.
+    default: [$first]
 
 agents:
-  - name: triager
-    provider: opencode
-    model: gemini-1.5-flash
+  - name: "{team}-triager"
+    description: Reads reports, classifies them, and routes bugs
+    addressing: anyone
+    provider: "{provider}"
+    location: "{location}"
+    directory: "{directory}"
     instructions: |
       You are the triager of a small engineering team. For each report posted in this room:
       1. Restate it in one line.
       2. Classify it as exactly one of: bug, question, request.
-      3. If bug: mention @repro by name with the one-line restatement and any details from the report. Do not guess the cause.
-      4. If question or request: answer briefly yourself or say who should handle it. Do not mention @repro.
+      3. If bug: mention @{team}-repro by name with the one-line restatement and any details from the report. Do not guess the cause.
+      4. If question or request: answer briefly yourself or say who should handle it. Do not mention @{team}-repro.
       Keep every message under 6 lines. Never write code.
 
-  - name: repro
-    provider: opencode
-    model: gemini-1.5-flash
+  - name: "{team}-repro"
+    description: Reproduces bugs in TARGET_REPO and outputs exact traces
+    addressing: owner-agents
+    provider: "{provider}"
+    location: "{location}"
+    directory: "{directory}"
     instructions: |
       You reproduce bugs in the project located at the path in TARGET_REPO.
-      When @triager routes a bug to you:
+      When @{team}-triager routes a bug to you:
       1. Read the relevant source files in the target repo. Do not modify them.
       2. Write the smallest script in the target repo's repro/ folder that demonstrates the bug.
       3. Run it and post the exact command and exact output in this thread.
       4. State in one line what is wrong, based on the output only.
       5. Mention @digest so it can summarise and propose a fix.
       If you cannot reproduce it, say so and list what you tried.
+
+room:
+  name: "{team}-triage"
+  bridge: "{bridge}"
+  agents:
+    - "{team}-triager"
+    - "{team}-repro"
+  users:
+    - "{$creator}"
+
+kickoff: |
+  @{team}-triager and @{team}-repro: this is the bug triage room. @digest will join to summarise and propose fixes.

@@ -1,28 +1,46 @@
-# Assumptions and Switch Protocol Notes
+# Assumptions and Technical Discoveries
 
-This document records assumptions and discoveries about Switch, its Agent Protocol, and open questions encountered during development.
-
----
-
-## 1. Switch Agent Protocol
-
-- **Protocol Overview**: Agents connect to Switch rooms using SSE (Server-Sent Events) for incoming messages/events and standard HTTP POST requests for outgoing messages.
-- **Server Endpoint**: Default Switch server runs locally (via Switch Console Docker stack) or at `SWITCH_SERVER_URL` (typically `http://localhost:3000` or `http://localhost:8000`).
-- **SSE Stream**: Room event stream URL is typically `GET /api/rooms/{room_id}/events` or `GET /v1/rooms/{room_id}/sse`.
-- **Message Send**: Outgoing messages posted to `POST /api/rooms/{room_id}/messages` or `POST /v1/messages`.
-- **Mention Convention**: Switch agents listen to the room log and act when their name is explicitly mentioned (e.g. `@digest`).
+This document records technical details, verified Switch schemas, and target repo analyses as required by the Build Specification.
 
 ---
 
-## 2. Agent Template Schema
+## 1. Verified Target Issues in Mem-CLI (Target Repo)
 
-- Switch agent templates (`triage-room.template.yaml`) define rooms, participants, providers, and kickoff messages.
-- Console manages local containers (Mattermost, Postgres, agent runner) and CLI agents (e.g. OpenCode).
+### Bug 01: Subcommand Argument Parsing Rejects Postfixed `-u` / `--user`
+- **Location:** `src/memcli/cli.py` (`main()`)
+- **Underlying Cause:**
+  `parser.add_argument("-u", "--user", ...)` is defined on the root `ArgumentParser` before `parser.add_subparsers(...)`. In Python's `argparse`, options on the parent parser are not automatically accepted after subcommands unless defined on a shared parent parser passed to each subparser (`parents=[parent_parser]`) or declared explicitly per subparser.
+- **Observed Behavior:**
+  Running `memcli list -u repro-bot` or `memcli clear -u repro-bot --confirm` causes `argparse` to error out:
+  `memcli: error: unrecognized arguments: -u repro-bot`
+  Currently, users are forced to write `memcli -u repro-bot list`.
+- **Expected Behavior:**
+  Users should be able to pass `-u` either before or after subcommands (`memcli list -u repro-bot` or `memcli -u repro-bot list`).
+
+### Bug 02: Windows CSV Export Double Carriage Return (`\r\r\n`)
+- **Location:** `src/memcli/cli.py` (export handler, lines 298-301)
+- **Underlying Cause:**
+  When generating CSV output, `csv.DictWriter(io.StringIO(), ...)` generates CRLF (`\r\n`) line terminators. When writing to a file using `with open(args.output, "w", encoding="utf-8") as f: f.write(output_content)`, Python on Windows translates `\n` to `\r\n` by default, turning `\r\n` into `\r\r\n` (byte sequence `0x0D 0x0D 0x0A`).
+- **Observed Behavior:**
+  Files created with `memcli -u repro-bot export --format csv -o memories.csv` have double line breaks and empty rows when opened in Excel or CSV readers.
+- **Expected Behavior:**
+  Opening the output file with `newline=""` or specifying `lineterminator="\n"` in `DictWriter` prevents duplicate carriage return translation.
+
+### Report 03: Non-Bug User Query
+- Tests the non-bug classification path. `@triager` answers directly that Mem-CLI isolates users via the `-u <user_id>` parameter and `user_id` index in PostgreSQL, without invoking `@repro`.
 
 ---
 
-## 3. Target Repo: Mem-CLI
+## 2. Switch Agent Protocol Discoveries & Schema
 
-- Target repository: `https://github.com/flexxy-07/Mem-CLI`.
-- Uses PostgreSQL 17 with `pgvector` (`halfvec(3072)`), running on port 5433 to avoid standard port 5432 clashes.
-- Repro agent runs only against throwaway namespace `repro-bot` and scripts are placed in `TARGET_REPO/repro/`.
+- **Template Schema:**
+  Verified against `sandbox-quantum/switch` (`examples/agent-templates/triage-pair.template.yaml`):
+  - Root fields: `version: 1`, `params:`, `agents:`, `room:`, `kickoff:`.
+  - Agents specify `name`, `description`, `addressing`, `provider`, `location`, `directory`, `instructions`.
+  - Rooms specify `name`, `bridge`, `agents`, `users: ["{$creator}"]`.
+- **Switch Agent Protocol Wire Endpoints:**
+  - SSE real-time stream: `GET /gateway/rooms/{room_id}/events` or `GET /api/rooms/{room_id}/events` (with `Accept: text/event-stream`).
+  - Outgoing message dispatch: `POST /gateway/rooms/{room_id}/messages` or `POST /api/rooms/{room_id}/messages` (with JSON body `{"content": text, "thread_id": thread_id}`).
+  - Mention semantics: Agents act on `@agent_name` mentions in the room or thread.
+- **Provider & Model:**
+  - OpenCode / Gemini models: `gemini-3.5-flash-lite` or current active Flash models in Google AI Studio.

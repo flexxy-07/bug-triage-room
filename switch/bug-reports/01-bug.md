@@ -1,1 +1,1 @@
-@triager I noticed an issue when updating user preferences in Mem-CLI. I previously told it I switched from Java to Rust, but when running `memcli list` it still shows both conflicting memories as active instead of superseding the older one.
+@triager When I run commands like `memcli list -u my-user` or `memcli clear -u my-user --confirm`, it fails with an unrecognized arguments error for `-u`, even though `-u` is shown in the top-level help text.

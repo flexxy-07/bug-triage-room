@@ -1,1 +1,1 @@
-@triager When exporting memories with `memcli export --format csv`, memory texts containing commas or newlines break the CSV columns and corrupt the output.
+@triager When exporting memories to a file using `memcli -u my-user export --format csv -o memories.csv`, opening the file in Excel or VS Code shows extra blank lines between every record and corrupts the table layout.

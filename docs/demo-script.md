@@ -52,3 +52,4 @@ This script follows Section 12 of `BUILD_SPEC.md` for the Flip the Switch Hackat
 ### Step 8 (1:45 - 2:00): Closing & Switch Architecture
 - **Voiceover / Text:** "Switch provides the shared room and protocol that makes autonomous multi-agent handoff and human-in-the-loop triage seamless."
 - **Visual:** Display `docs/architecture.png`.
+

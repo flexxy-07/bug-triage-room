@@ -17,3 +17,4 @@ def create_digest_graph():
     builder = StateGraph(DigestState)
     # Nodes will be implemented in Checkpoint 7
     return builder
+
