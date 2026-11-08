@@ -1,0 +1,1 @@
+@triager I noticed an issue when updating user preferences in Mem-CLI. I previously told it I switched from Java to Rust, but when running `memcli list` it still shows both conflicting memories as active instead of superseding the older one.

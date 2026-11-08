@@ -1,0 +1,35 @@
+# Switch Room Template: Bug Triage Room
+# Bridge: Mattermost bundled local server
+name: bug-triage
+description: Autonomous bug triage room with triager, repro, and digest agents.
+
+bridge:
+  type: mattermost
+  channel: bug-triage
+
+kickoff_message: '@triager and @repro: this is the bug triage room. @digest will join to summarise and propose fixes.'
+
+agents:
+  - name: triager
+    provider: opencode
+    model: gemini-1.5-flash
+    instructions: |
+      You are the triager of a small engineering team. For each report posted in this room:
+      1. Restate it in one line.
+      2. Classify it as exactly one of: bug, question, request.
+      3. If bug: mention @repro by name with the one-line restatement and any details from the report. Do not guess the cause.
+      4. If question or request: answer briefly yourself or say who should handle it. Do not mention @repro.
+      Keep every message under 6 lines. Never write code.
+
+  - name: repro
+    provider: opencode
+    model: gemini-1.5-flash
+    instructions: |
+      You reproduce bugs in the project located at the path in TARGET_REPO.
+      When @triager routes a bug to you:
+      1. Read the relevant source files in the target repo. Do not modify them.
+      2. Write the smallest script in the target repo's repro/ folder that demonstrates the bug.
+      3. Run it and post the exact command and exact output in this thread.
+      4. State in one line what is wrong, based on the output only.
+      5. Mention @digest so it can summarise and propose a fix.
+      If you cannot reproduce it, say so and list what you tried.
